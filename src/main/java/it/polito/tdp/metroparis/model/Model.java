@@ -1,26 +1,31 @@
 package it.polito.tdp.metroparis.model;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.jgrapht.Graph;
+import org.jgrapht.GraphPath;
 import org.jgrapht.Graphs;
-import org.jgrapht.graph.DefaultEdge;
+import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
+import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleGraph;
-import org.jgrapht.traverse.BreadthFirstIterator;
+
+
+
+import com.javadocmd.simplelatlng.LatLngTool;
+import com.javadocmd.simplelatlng.util.LengthUnit;
 
 import it.polito.tdp.metroparis.db.MetroDAO;
 
 public class Model {
-	private Graph<Fermata, DefaultEdge> grafo;
+	private Graph<Fermata, DefaultWeightedEdge> grafo;
 	List<Fermata> fermate;
 	private Map<Integer, Fermata> fermateIDMap;
 
 	public void creaGrafo() {
 		// Bisogna creare sempre il grafo specificando il tipo degli archi
-		this.grafo = new SimpleGraph<>(DefaultEdge.class);
+		this.grafo = new SimpleGraph<>(DefaultWeightedEdge.class);
 
 		// aggiungi vertici
 		MetroDAO dao = new MetroDAO();
@@ -76,7 +81,8 @@ public class Model {
 		 */
 		List<coppieF> allCoppie = dao.getAllCoppie(fermateIDMap);
 		for (coppieF coppia : allCoppie) {
-			this.grafo.addEdge(coppia.getPartenza(), coppia.getArrivo());
+			double distanza =LatLngTool.distance(coppia.getPartenza().getCoords(), coppia.getArrivo().getCoords(), LengthUnit.METER);
+			Graphs.addEdge(this.grafo, coppia.getPartenza(), coppia.getArrivo(), distanza);
 		}
 
 		System.out.println("Grafo creato con " + this.grafo.vertexSet().size() + " vertici e "
@@ -94,28 +100,11 @@ public class Model {
 	 *         all'altra
 	 */
 	public List<Fermata> percorso(Fermata partenza, Fermata arrivo) {
-		BreadthFirstIterator<Fermata, DefaultEdge> visita = new BreadthFirstIterator<>(this.grafo, partenza);
-		List<Fermata> raggiungibili = new ArrayList<>();
-		while (visita.hasNext()) {
-			Fermata f = visita.next();
-//			raggiungibili.add(f);
-		}
-//		System.out.println(raggiungibili);
-
-		// Trova il percorso sull'albero visita
-		List<Fermata> percorso = new ArrayList<>();
-		Fermata corrente = arrivo;
-		percorso.add(arrivo);
-		DefaultEdge e = visita.getSpanningTreeEdge(corrente);
-		while (e != null) {
-			Fermata precedente = Graphs.getOppositeVertex(this.grafo, e, corrente);
-			percorso.add(0,precedente);
-			corrente = precedente;
-			e = visita.getSpanningTreeEdge(corrente);
-
-		}
-
-		return percorso;
+		DijkstraShortestPath<Fermata, DefaultWeightedEdge> sp =
+				new DijkstraShortestPath<>(grafo);
+		
+		GraphPath<Fermata, DefaultWeightedEdge> gp = sp.getPath(partenza, arrivo);
+		return gp.getVertexList();
 	}
 
 	public List<Fermata> getAllFermate() {
